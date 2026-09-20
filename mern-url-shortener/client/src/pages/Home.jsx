@@ -2,7 +2,7 @@ import React, { useState, useContext, useRef } from 'react';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 import { AuthContext } from '../context/AuthContext';
-import { Copy, Check, Clock, Sparkles, Layers, Link2, Upload } from 'lucide-react';
+import { Copy, Check, Clock, Sparkles, Layers, Link2, Upload, Calendar } from 'lucide-react';
 
 export default function Home() {
   const { user } = useContext(AuthContext);
@@ -20,9 +20,16 @@ export default function Home() {
   const fileInputRef = useRef(null);
   
   // Shared State
+  const [expiresAt, setExpiresAt] = useState('');
   const [copiedId, setCopiedId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Get current time formatted for datetime-local min attribute
+  const getCurrentDateTime = () => {
+    const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+    return (new Date(Date.now() - tzOffset)).toISOString().slice(0, 16);
+  };
 
   const handleSingleSubmit = async (e) => {
     e.preventDefault();
@@ -31,7 +38,8 @@ export default function Home() {
       const res = await axios.post('http://localhost:5000/api/url/shorten', {
         longUrl,
         customAlias: customAlias.trim() || undefined,
-        customLength: parseInt(customLength)
+        customLength: parseInt(customLength),
+        expiresAt: expiresAt || undefined
       });
       setResult(res.data);
     } catch (err) {
@@ -54,7 +62,10 @@ export default function Home() {
     }
 
     try {
-      const res = await axios.post('http://localhost:5000/api/url/shorten-bulk', { urls });
+      const res = await axios.post('http://localhost:5000/api/url/shorten-bulk', { 
+        urls,
+        expiresAt: expiresAt || undefined
+      });
       setBulkResults(res.data);
     } catch (err) {
       setError(err.response?.data?.msg || 'Something went wrong');
@@ -63,7 +74,6 @@ export default function Home() {
     }
   };
 
-  // CSV Parsing Logic
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -71,8 +81,6 @@ export default function Home() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target.result;
-      
-      // Split by newlines, get the first column (in case of standard CSVs), and filter empty lines
       const extractedUrls = text.split(/\r?\n/)
         .map(line => line.split(',')[0].trim())
         .filter(url => url.startsWith('http://') || url.startsWith('https://'));
@@ -83,17 +91,15 @@ export default function Home() {
       }
       
       if (extractedUrls.length > 10) {
-        setError('Found more than 10 URLs. Only the first 10 have been loaded to prevent server overload.');
+        setError('Found more than 10 URLs. Only the first 10 have been loaded.');
         extractedUrls.length = 10;
       } else {
         setError('');
       }
 
       setBulkInput(extractedUrls.join('\n'));
-      // Reset file input so the same file can be uploaded again if needed
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
-    
     reader.readAsText(file);
   };
 
@@ -108,12 +114,8 @@ export default function Home() {
       <div className="max-w-3xl mx-auto space-y-8">
         
         <div className="text-center space-y-3">
-          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-            Shorten URLs in Seconds
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 text-lg">
-            Fast, secure, and smart link management.
-          </p>
+          <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">Shorten URLs in Seconds</h1>
+          <p className="text-gray-600 dark:text-gray-400 text-lg">Fast, secure, and smart link management.</p>
           {!user && (
             <div className="inline-flex items-center gap-2 bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 px-3 py-1.5 rounded-full text-xs font-medium border border-amber-200 dark:border-amber-800">
               <Clock className="w-3.5 h-3.5" /> Guest links auto-delete in 24 hours. Sign in to save permanently!
@@ -124,10 +126,10 @@ export default function Home() {
         {/* Mode Toggle */}
         <div className="flex justify-center">
           <div className="inline-flex bg-gray-200 dark:bg-gray-800 p-1 rounded-lg">
-            <button onClick={() => { setMode('single'); setError(''); }} className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'single' ? 'bg-white dark:bg-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}>
+            <button onClick={() => { setMode('single'); setError(''); }} className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'single' ? 'bg-white dark:bg-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400'}`}>
               <Link2 className="w-4 h-4" /> Single
             </button>
-            <button onClick={() => { setMode('bulk'); setError(''); }} className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'bulk' ? 'bg-white dark:bg-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}>
+            <button onClick={() => { setMode('bulk'); setError(''); }} className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'bulk' ? 'bg-white dark:bg-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400'}`}>
               <Layers className="w-4 h-4" /> Bulk
             </button>
           </div>
@@ -150,6 +152,16 @@ export default function Home() {
                 <input type="number" min="4" max="12" value={customLength} onChange={(e) => setCustomLength(e.target.value)} disabled={!!customAlias} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50" />
               </div>
             </div>
+            
+            {user && (
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium mb-1 text-indigo-600 dark:text-indigo-400">
+                  <Calendar className="w-4 h-4" /> Link Expiration (Optional)
+                </label>
+                <input type="datetime-local" min={getCurrentDateTime()} value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none [color-scheme:light] dark:[color-scheme:dark]" />
+              </div>
+            )}
+
             {error && <div className="text-red-500 text-sm font-medium">{error}</div>}
             <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2">
               {loading ? 'Shortening...' : 'Shorten URL'}
@@ -170,15 +182,18 @@ export default function Home() {
                   </label>
                 </div>
               </div>
-              <textarea
-                required
-                rows="6"
-                placeholder="https://example.com/page1&#10;https://example.com/page2"
-                value={bulkInput}
-                onChange={(e) => setBulkInput(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-              />
+              <textarea required rows="6" placeholder="https://example.com/page1&#10;https://example.com/page2" value={bulkInput} onChange={(e) => setBulkInput(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none resize-none" />
             </div>
+
+            {user && (
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-medium mb-1 text-indigo-600 dark:text-indigo-400">
+                  <Calendar className="w-4 h-4" /> Batch Expiration (Optional)
+                </label>
+                <input type="datetime-local" min={getCurrentDateTime()} value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none [color-scheme:light] dark:[color-scheme:dark]" />
+              </div>
+            )}
+
             {error && <div className="text-red-500 text-sm font-medium">{error}</div>}
             <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2">
               {loading ? 'Processing Batch...' : 'Shorten All URLs'}
@@ -236,7 +251,6 @@ export default function Home() {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

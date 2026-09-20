@@ -27,14 +27,12 @@ const extractCategory = async (targetUrl) => {
 
 // Create Short URL
 router.post('/shorten', verifyToken, createUrlLimiter, async (req, res) => {
-    const { longUrl, customLength, customAlias } = req.body;
+    const { longUrl, customLength, customAlias, expiresAt } = req.body;
     const baseUrl = process.env.BASE_URL;
 
-    // Check if custom alias is provided, else generate code
     let urlCode = customAlias;
     if (!urlCode) {
         if (customLength) {
-            // Generate custom length random string
             urlCode = crypto.randomBytes(Math.ceil(customLength / 2)).toString('hex').slice(0, customLength);
         } else {
             urlCode = shortid.generate();
@@ -42,7 +40,6 @@ router.post('/shorten', verifyToken, createUrlLimiter, async (req, res) => {
     }
 
     try {
-        // Ensure alias isn't taken
         let existingUrl = await Url.findOne({ urlCode });
         if (existingUrl) return res.status(400).json({ msg: 'Alias or Code already in use' });
 
@@ -57,16 +54,66 @@ router.post('/shorten', verifyToken, createUrlLimiter, async (req, res) => {
             user: req.user ? req.user.id : null,
         };
 
-        // If anonymous user, delete after 24 hours
+        // Date Logic: 24h for guests, Custom for logged-in users
         if (!req.user) {
             urlData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
+        } else if (expiresAt) {
+            urlData.expiresAt = new Date(expiresAt);
         }
 
         const url = new Url(urlData);
         await url.save();
         res.json(url);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
+// Bulk Shorten URLs
+router.post('/shorten-bulk', verifyToken, createUrlLimiter, async (req, res) => {
+    const { urls, expiresAt } = req.body;
+    
+    if (!Array.isArray(urls) || urls.length === 0) {
+        return res.status(400).json({ msg: 'Please provide an array of URLs' });
+    }
+    if (urls.length > 10) {
+        return res.status(400).json({ msg: 'Bulk shortening is limited to 10 URLs per request' });
+    }
+
+    const baseUrl = process.env.BASE_URL;
+
+    try {
+        const urlPromises = urls.map(async (longUrl) => {
+            const urlCode = shortid.generate();
+            const category = await extractCategory(longUrl);
+            const shortUrl = `${baseUrl}/${urlCode}`;
+            
+            const urlData = {
+                longUrl,
+                shortUrl,
+                urlCode,
+                category,
+                user: req.user ? req.user.id : null,
+            };
+
+            // Date Logic: 24h for guests, Custom for logged-in users
+            if (!req.user) {
+                urlData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
+            } else if (expiresAt) {
+                urlData.expiresAt = new Date(expiresAt);
+            }
+            
+            return urlData;
+        });
+
+        const resolvedUrls = await Promise.all(urlPromises);
+        const savedUrls = await Url.insertMany(resolvedUrls);
+        
+        res.json(savedUrls);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ msg: 'Server Error during bulk processing' });
     }
 });
 
@@ -110,56 +157,6 @@ router.delete('/:id', verifyToken, requireAuth, async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ msg: 'Server Error' });
-    }
-});
-
-// Bulk Shorten URLs
-router.post('/shorten-bulk', verifyToken, createUrlLimiter, async (req, res) => {
-    const { urls } = req.body;
-    
-    // Validate input
-    if (!Array.isArray(urls) || urls.length === 0) {
-        return res.status(400).json({ msg: 'Please provide an array of URLs' });
-    }
-    if (urls.length > 10) {
-        return res.status(400).json({ msg: 'Bulk shortening is limited to 10 URLs per request' });
-    }
-
-    const baseUrl = process.env.BASE_URL;
-
-    try {
-        // Process all URLs in parallel
-        const urlPromises = urls.map(async (longUrl) => {
-            const urlCode = shortid.generate();
-            const category = await extractCategory(longUrl);
-            const shortUrl = `${baseUrl}/${urlCode}`;
-            
-            const urlData = {
-                longUrl,
-                shortUrl,
-                urlCode,
-                category,
-                user: req.user ? req.user.id : null,
-            };
-
-            // Apply 24-hour expiration for anonymous users
-            if (!req.user) {
-                urlData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
-            }
-            
-            return urlData;
-        });
-
-        // Wait for all scraping and code generation to finish
-        const resolvedUrls = await Promise.all(urlPromises);
-        
-        // Use insertMany for a single, efficient database write
-        const savedUrls = await Url.insertMany(resolvedUrls);
-        
-        res.json(savedUrls);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ msg: 'Server Error during bulk processing' });
     }
 });
 
