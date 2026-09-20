@@ -5,7 +5,7 @@ export default function AdminDashboard() {
   const [urls, setUrls] = useState([]);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/url/all-urls')
+    axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/url/all-urls`)
       .then((res) => setUrls(res.data))
       .catch((err) => console.error(err));
   }, []);

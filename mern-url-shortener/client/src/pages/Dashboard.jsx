@@ -12,7 +12,7 @@ export default function Dashboard() {
 
   const fetchUserUrls = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/url/my-urls');
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/url/my-urls`);
       setUrls(res.data);
     } catch (err) {
       console.error(err);
@@ -28,7 +28,7 @@ export default function Dashboard() {
   const deleteUrl = async (id) => {
     if (!window.confirm('Are you sure you want to delete this URL?')) return;
     try {
-      await axios.delete(`http://localhost:5000/api/url/${id}`);
+      await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/url/${id}`);
       setUrls(urls.filter(url => url._id !== id));
     } catch (err) {
       console.error('Error deleting URL:', err);

@@ -35,12 +35,12 @@ export default function Home() {
     e.preventDefault();
     setLoading(true); setError(''); setResult(null);
     try {
-      const res = await axios.post('http://localhost:5000/api/url/shorten', {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/url/shorten`, {
         longUrl,
         customAlias: customAlias.trim() || undefined,
         customLength: parseInt(customLength),
         expiresAt: expiresAt || undefined,
-        password: password || undefined // <-- NEW AXIOS PAYLOAD
+        password: password || undefined
       });
       setResult(res.data);
     } catch (err) {
@@ -63,10 +63,10 @@ export default function Home() {
     }
 
     try {
-      const res = await axios.post('http://localhost:5000/api/url/shorten-bulk', { 
+      const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/url/shorten-bulk`, { 
         urls,
         expiresAt: expiresAt || undefined,
-        password: password || undefined // <-- NEW AXIOS PAYLOAD
+        password: password || undefined 
       });
       setBulkResults(res.data);
     } catch (err) {

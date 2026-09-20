@@ -15,7 +15,7 @@ export default function Unlock() {
     setError('');
 
     try {
-      const res = await axios.post(`http://localhost:5000/api/url/unlock/${code}`, { password });
+      const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/url/unlock/${code}`, { password });
       window.location.href = res.data.longUrl; // Redirect to actual destination
     } catch (err) {
       setError(err.response?.data?.msg || 'Failed to unlock URL');
