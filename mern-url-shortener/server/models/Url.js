@@ -4,13 +4,18 @@ const UrlSchema = new mongoose.Schema({
     urlCode:     { type: String, required: true, unique: true },
     longUrl:     { type: String, required: true },
     shortUrl:    { type: String, required: true },
-    category:    { type: String, default: 'General' }, // Auto-categorized feature
+    category:    { type: String, default: 'General' },
     user:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     clicks:      { type: Number, default: 0 },
-    expiresAt:   { type: Date, default: null } 
+    expiresAt:   { type: Date, default: null },
+    // New Analytics Field
+    analytics: {
+        mobile: { type: Number, default: 0 },
+        desktop: { type: Number, default: 0 },
+        referrers: { type: Map, of: Number, default: {} } // Stores { "twitter.com": 5, "Direct": 12 }
+    }
 }, { timestamps: true });
 
-// TTL Index: MongoDB automatically deletes documents where expiresAt is reached
 UrlSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('Url', UrlSchema);
