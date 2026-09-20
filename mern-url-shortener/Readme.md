@@ -10,6 +10,7 @@ A full-stack URL shortening service built with the MERN stack (MongoDB, Express,
 * **Custom Link Generation:** Users can define custom aliases or specify the exact character length of their randomized short links using Node's native `crypto` module.
 * **Analytics & QR Integration:** Real-time click tracking and automatic QR code generation for every shortened link.
 * **Modern UI/UX:** Fully responsive design built with Vite and Tailwind v4, including a Context-driven Dark/Light mode toggle.
+* **High-Performance Caching**: The redirection endpoint utilizes node-cache for in-memory storage, drastically reducing database reads. Analytics tracking relies on non-blocking, atomic MongoDB $inc operations (fire-and-forget), ensuring instantaneous user redirection.
 
 ## 💻 Tech Stack
 
