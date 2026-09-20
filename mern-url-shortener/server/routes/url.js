@@ -6,6 +6,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const Url = require('../models/Url');
 const { verifyToken, requireAuth } = require('../middleware/auth');
+const { createUrlLimiter } = require('../middleware/rateLimiter');
 
 // Helper to auto-categorize based on page metadata (No AI Key needed)
 const extractCategory = async (targetUrl) => {
@@ -25,7 +26,7 @@ const extractCategory = async (targetUrl) => {
 };
 
 // Create Short URL
-router.post('/shorten', verifyToken, async (req, res) => {
+router.post('/shorten', verifyToken, createUrlLimiter, async (req, res) => {
     const { longUrl, customLength, customAlias } = req.body;
     const baseUrl = process.env.BASE_URL;
 
