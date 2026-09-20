@@ -20,7 +20,8 @@ router.get('/:code', async (req, res) => {
             if (rawReferrer) {
                 try {
                     const urlObj = new URL(rawReferrer);
-                    referrerDomain = urlObj.hostname.replace('www.', '');
+                    // Replace dots with underscores to prevent MongoDB key errors
+                    referrerDomain = urlObj.hostname.replace('www.', '').replace(/\./g, '_'); 
                 } catch (e) {
                     referrerDomain = 'Direct';
                 }
@@ -41,12 +42,12 @@ router.get('/:code', async (req, res) => {
         // Check Cache
         const cachedData = cache.get(code);
         if (cachedData) {
+            recordAnalytics(); // <-- RECORD ANALYTICS FIRST
+            
             if (cachedData.hasPassword) {
                 return res.redirect(`${FRONTEND_URL}/unlock/${code}`);
             }
-            res.redirect(cachedData.longUrl);
-            recordAnalytics();
-            return;
+            return res.redirect(cachedData.longUrl);
         }
 
         // Cache Miss: Database Lookup
@@ -55,12 +56,12 @@ router.get('/:code', async (req, res) => {
         if (url) {
             cache.set(code, { longUrl: url.longUrl, hasPassword: !!url.password });
             
+            recordAnalytics(); // <-- RECORD ANALYTICS FIRST
+            
             if (url.password) {
                 return res.redirect(`${FRONTEND_URL}/unlock/${code}`);
             }
-            
-            res.redirect(url.longUrl);
-            recordAnalytics();
+            return res.redirect(url.longUrl);
         } else {
             return res.status(404).json({ msg: 'No URL found' });
         }
