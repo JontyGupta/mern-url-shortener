@@ -8,11 +8,11 @@ const UrlSchema = new mongoose.Schema({
     user:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     clicks:      { type: Number, default: 0 },
     expiresAt:   { type: Date, default: null },
-    // New Analytics Field
+    password:    { type: String, default: null }, // NEW
     analytics: {
         mobile: { type: Number, default: 0 },
         desktop: { type: Number, default: 0 },
-        referrers: { type: Map, of: Number, default: {} } // Stores { "twitter.com": 5, "Direct": 12 }
+        referrers: { type: Map, of: Number, default: {} }
     }
 }, { timestamps: true });
 

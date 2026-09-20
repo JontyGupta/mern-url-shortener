@@ -2,7 +2,7 @@ import React, { useState, useContext, useRef } from 'react';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 import { AuthContext } from '../context/AuthContext';
-import { Copy, Check, Clock, Sparkles, Layers, Link2, Upload, Calendar } from 'lucide-react';
+import { Copy, Check, Clock, Sparkles, Layers, Link2, Upload, Calendar, Lock } from 'lucide-react';
 
 export default function Home() {
   const { user } = useContext(AuthContext);
@@ -21,11 +21,11 @@ export default function Home() {
   
   // Shared State
   const [expiresAt, setExpiresAt] = useState('');
+  const [password, setPassword] = useState(''); // <-- NEW PASSWORD STATE
   const [copiedId, setCopiedId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Get current time formatted for datetime-local min attribute
   const getCurrentDateTime = () => {
     const tzOffset = (new Date()).getTimezoneOffset() * 60000;
     return (new Date(Date.now() - tzOffset)).toISOString().slice(0, 16);
@@ -39,7 +39,8 @@ export default function Home() {
         longUrl,
         customAlias: customAlias.trim() || undefined,
         customLength: parseInt(customLength),
-        expiresAt: expiresAt || undefined
+        expiresAt: expiresAt || undefined,
+        password: password || undefined // <-- NEW AXIOS PAYLOAD
       });
       setResult(res.data);
     } catch (err) {
@@ -64,7 +65,8 @@ export default function Home() {
     try {
       const res = await axios.post('http://localhost:5000/api/url/shorten-bulk', { 
         urls,
-        expiresAt: expiresAt || undefined
+        expiresAt: expiresAt || undefined,
+        password: password || undefined // <-- NEW AXIOS PAYLOAD
       });
       setBulkResults(res.data);
     } catch (err) {
@@ -154,11 +156,26 @@ export default function Home() {
             </div>
             
             {user && (
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-medium mb-1 text-indigo-600 dark:text-indigo-400">
-                  <Calendar className="w-4 h-4" /> Link Expiration (Optional)
-                </label>
-                <input type="datetime-local" min={getCurrentDateTime()} value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none [color-scheme:light] dark:[color-scheme:dark]" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium mb-1 text-indigo-600 dark:text-indigo-400">
+                    <Calendar className="w-4 h-4" /> Link Expiration (Optional)
+                  </label>
+                  <input type="datetime-local" min={getCurrentDateTime()} value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none [color-scheme:light] dark:[color-scheme:dark]" />
+                </div>
+                {/* NEW PASSWORD INPUT */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium mb-1 text-indigo-600 dark:text-indigo-400">
+                    <Lock className="w-4 h-4" /> Password Protection (Optional)
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Leave blank for public access" 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  />
+                </div>
               </div>
             )}
 
@@ -186,11 +203,26 @@ export default function Home() {
             </div>
 
             {user && (
-              <div>
-                <label className="flex items-center gap-1.5 text-sm font-medium mb-1 text-indigo-600 dark:text-indigo-400">
-                  <Calendar className="w-4 h-4" /> Batch Expiration (Optional)
-                </label>
-                <input type="datetime-local" min={getCurrentDateTime()} value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none [color-scheme:light] dark:[color-scheme:dark]" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium mb-1 text-indigo-600 dark:text-indigo-400">
+                    <Calendar className="w-4 h-4" /> Batch Expiration (Optional)
+                  </label>
+                  <input type="datetime-local" min={getCurrentDateTime()} value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none [color-scheme:light] dark:[color-scheme:dark]" />
+                </div>
+                {/* NEW PASSWORD INPUT */}
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-medium mb-1 text-indigo-600 dark:text-indigo-400">
+                    <Lock className="w-4 h-4" /> Password Protection (Optional)
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Leave blank for public access" 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-indigo-500 outline-none" 
+                  />
+                </div>
               </div>
             )}
 

@@ -4,6 +4,7 @@ const shortid = require('shortid');
 const crypto = require('crypto');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const bcrypt = require('bcryptjs');
 const Url = require('../models/Url');
 const { verifyToken, requireAuth } = require('../middleware/auth');
 const { createUrlLimiter } = require('../middleware/rateLimiter');
@@ -27,7 +28,8 @@ const extractCategory = async (targetUrl) => {
 
 // Create Short URL
 router.post('/shorten', verifyToken, createUrlLimiter, async (req, res) => {
-    const { longUrl, customLength, customAlias, expiresAt } = req.body;
+    // 1. Destructure password from req.body
+    const { longUrl, customLength, customAlias, expiresAt, password } = req.body;
     const baseUrl = process.env.BASE_URL;
 
     let urlCode = customAlias;
@@ -61,6 +63,12 @@ router.post('/shorten', verifyToken, createUrlLimiter, async (req, res) => {
             urlData.expiresAt = new Date(expiresAt);
         }
 
+        // 2. Hash and store password if provided
+        if (password) {
+            const salt = await bcrypt.genSalt(10);
+            urlData.password = await bcrypt.hash(password, salt);
+        }
+
         const url = new Url(urlData);
         await url.save();
         res.json(url);
@@ -72,7 +80,8 @@ router.post('/shorten', verifyToken, createUrlLimiter, async (req, res) => {
 
 // Bulk Shorten URLs
 router.post('/shorten-bulk', verifyToken, createUrlLimiter, async (req, res) => {
-    const { urls, expiresAt } = req.body;
+    // 1. Destructure password from req.body
+    const { urls, expiresAt, password } = req.body;
     
     if (!Array.isArray(urls) || urls.length === 0) {
         return res.status(400).json({ msg: 'Please provide an array of URLs' });
@@ -84,6 +93,13 @@ router.post('/shorten-bulk', verifyToken, createUrlLimiter, async (req, res) => 
     const baseUrl = process.env.BASE_URL;
 
     try {
+        // 2. Hash password once for the entire batch if provided
+        let hashedPassword = null;
+        if (password) {
+            const salt = await bcrypt.genSalt(10);
+            hashedPassword = await bcrypt.hash(password, salt);
+        }
+
         const urlPromises = urls.map(async (longUrl) => {
             const urlCode = shortid.generate();
             const category = await extractCategory(longUrl);
@@ -95,6 +111,7 @@ router.post('/shorten-bulk', verifyToken, createUrlLimiter, async (req, res) => 
                 urlCode,
                 category,
                 user: req.user ? req.user.id : null,
+                password: hashedPassword // 3. Assign hashed password
             };
 
             // Date Logic: 24h for guests, Custom for logged-in users
@@ -114,6 +131,34 @@ router.post('/shorten-bulk', verifyToken, createUrlLimiter, async (req, res) => 
     } catch (err) {
         console.error(err);
         res.status(500).json({ msg: 'Server Error during bulk processing' });
+    }
+});
+
+// Unlock Protected URL (NEW ROUTE)
+router.post('/unlock/:code', async (req, res) => {
+    const { password } = req.body;
+    try {
+        const url = await Url.findOne({ urlCode: req.params.code });
+        
+        // Ensure URL exists and actually has a password
+        if (!url || !url.password) {
+            return res.status(404).json({ msg: 'URL not found or not protected' });
+        }
+
+        // Compare submitted password with hashed password
+        const isMatch = await bcrypt.compare(password, url.password);
+        if (!isMatch) {
+            return res.status(401).json({ msg: 'Incorrect Password' });
+        }
+
+        // Manually increment clicks since we bypassed the standard cache redirect
+        url.clicks++;
+        await url.save();
+        
+        res.json({ longUrl: url.longUrl });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ msg: 'Server Error' });
     }
 });
 
@@ -160,4 +205,4 @@ router.delete('/:id', verifyToken, requireAuth, async (req, res) => {
     }
 });
 
-module.exports = router;    
+module.exports = router;

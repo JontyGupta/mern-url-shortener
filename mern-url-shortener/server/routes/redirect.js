@@ -3,32 +3,29 @@ const router = express.Router();
 const Url = require('../models/Url');
 const NodeCache = require('node-cache');
 
-// Initialize cache (stdTTL: 3600 seconds = 1 hour time-to-live)
 const cache = new NodeCache({ stdTTL: 3600 });
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 router.get('/:code', async (req, res) => {
     try {
         const { code } = req.params;
 
-        // 1. Determine Analytics Data from Request Headers
-        const ua = req.headers['user-agent'] || '';
-        const isMobile = /Mobile|Android|iP(hone|od|ad)|IEMobile|BlackBerry|Kindle|Opera Mini/i.test(ua);
-        const deviceType = isMobile ? 'mobile' : 'desktop';
-
-        const rawReferrer = req.headers.referer || req.headers.referrer || '';
-        let referrerDomain = 'Direct';
-        if (rawReferrer) {
-            try {
-                const urlObj = new URL(rawReferrer);
-                referrerDomain = urlObj.hostname.replace('www.', '');
-            } catch (e) {
-                referrerDomain = 'Direct';
-            }
-        }
-
-        // 2. Non-blocking Database Analytics Update 
-        // Uses MongoDB's atomic $inc operator to update stats without reading the document first
         const recordAnalytics = () => {
+            const ua = req.headers['user-agent'] || '';
+            const isMobile = /Mobile|Android|iP(hone|od|ad)|IEMobile|BlackBerry|Kindle|Opera Mini/i.test(ua);
+            const deviceType = isMobile ? 'mobile' : 'desktop';
+
+            const rawReferrer = req.headers.referer || req.headers.referrer || '';
+            let referrerDomain = 'Direct';
+            if (rawReferrer) {
+                try {
+                    const urlObj = new URL(rawReferrer);
+                    referrerDomain = urlObj.hostname.replace('www.', '');
+                } catch (e) {
+                    referrerDomain = 'Direct';
+                }
+            }
+
             Url.updateOne(
                 { urlCode: code },
                 {
@@ -38,32 +35,32 @@ router.get('/:code', async (req, res) => {
                         [`analytics.referrers.${referrerDomain}`]: 1
                     }
                 }
-            ).catch(err => console.error('Analytics update failed:', err));
+            ).catch(err => console.error('Analytics error:', err));
         };
 
-        // 3. Check Cache Layer First
-        const cachedUrl = cache.get(code);
-        if (cachedUrl) {
-            // Instant redirect (Zero database reads!)
-            res.redirect(cachedUrl);
-            // Fire and forget analytics update in the background
+        // Check Cache
+        const cachedData = cache.get(code);
+        if (cachedData) {
+            if (cachedData.hasPassword) {
+                return res.redirect(`${FRONTEND_URL}/unlock/${code}`);
+            }
+            res.redirect(cachedData.longUrl);
             recordAnalytics();
             return;
         }
 
-        // 4. Cache Miss: Query Database
+        // Cache Miss: Database Lookup
         const url = await Url.findOne({ urlCode: code });
 
         if (url) {
-            // Store the long URL in memory cache for subsequent requests
-            cache.set(code, url.longUrl);
+            cache.set(code, { longUrl: url.longUrl, hasPassword: !!url.password });
             
-            // Redirect user
+            if (url.password) {
+                return res.redirect(`${FRONTEND_URL}/unlock/${code}`);
+            }
+            
             res.redirect(url.longUrl);
-            
-            // Fire and forget analytics update in the background
             recordAnalytics();
-            return;
         } else {
             return res.status(404).json({ msg: 'No URL found' });
         }
