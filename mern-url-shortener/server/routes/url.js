@@ -9,6 +9,15 @@ const Url = require('../models/Url');
 const { verifyToken, requireAuth } = require('../middleware/auth');
 const { createUrlLimiter } = require('../middleware/rateLimiter');
 
+const isValidHttpUrl = (value) => {
+    try {
+        const parsedUrl = new URL(value);
+        return (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') && Boolean(parsedUrl.hostname);
+    } catch (e) {
+        return false;
+    }
+};
+
 // Helper to auto-categorize based on page metadata (No AI Key needed)
 const extractCategory = async (targetUrl) => {
     try {
@@ -30,6 +39,11 @@ const extractCategory = async (targetUrl) => {
 router.post('/shorten', verifyToken, createUrlLimiter, async (req, res) => {
     // 1. Destructure password from req.body
     const { longUrl, customLength, customAlias, expiresAt, password } = req.body;
+
+    if (!isValidHttpUrl(longUrl)) {
+        return res.status(400).json({ msg: 'Please enter a valid URL starting with http:// or https://' });
+    }
+
     const baseUrl = process.env.BASE_URL;
 
     let urlCode = customAlias;
@@ -88,6 +102,11 @@ router.post('/shorten-bulk', verifyToken, createUrlLimiter, async (req, res) => 
     }
     if (urls.length > 10) {
         return res.status(400).json({ msg: 'Bulk shortening is limited to 10 URLs per request' });
+    }
+
+    const invalidUrl = urls.find((longUrl) => !isValidHttpUrl(longUrl));
+    if (invalidUrl) {
+        return res.status(400).json({ msg: `Invalid URL: ${invalidUrl}` });
     }
 
     const baseUrl = process.env.BASE_URL;
