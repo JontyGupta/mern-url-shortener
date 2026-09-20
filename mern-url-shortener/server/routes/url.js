@@ -90,4 +90,26 @@ router.get('/all-urls', verifyToken, requireAuth, async (req, res) => {
     }
 });
 
+// Delete URL
+router.delete('/:id', verifyToken, requireAuth, async (req, res) => {
+    try {
+        const url = await Url.findById(req.params.id);
+        
+        if (!url) {
+            return res.status(404).json({ msg: 'URL not found' });
+        }
+
+        // Ensure the logged-in user owns this URL (or is an admin)
+        if (url.user.toString() !== req.user.id && req.user.role !== 'admin') {
+            return res.status(401).json({ msg: 'User not authorized' });
+        }
+
+        await url.deleteOne();
+        res.json({ msg: 'URL removed' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ msg: 'Server Error' });
+    }
+});
+
 module.exports = router;    
