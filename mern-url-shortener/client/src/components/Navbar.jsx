@@ -2,7 +2,7 @@ import React, { useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
-import { Sun, Moon, Link2, LogOut, LayoutDashboard, Shield } from 'lucide-react';
+import { Sun, Moon, Link2, LogOut, LayoutDashboard, Shield, PlusCircle } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout } = useContext(AuthContext);
@@ -33,6 +33,13 @@ export default function Navbar() {
 
             {user ? (
               <>
+                <Link
+                  to="/"
+                  className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
+                >
+                  <PlusCircle className="w-4 h-4" /> Create URL
+                </Link>
+
                 <Link
                   to="/dashboard"
                   className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400"
