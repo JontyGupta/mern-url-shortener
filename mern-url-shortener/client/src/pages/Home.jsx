@@ -1,12 +1,12 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef } from 'react';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 import { AuthContext } from '../context/AuthContext';
-import { Copy, Check, Clock, Sparkles, Layers, Link2 } from 'lucide-react';
+import { Copy, Check, Clock, Sparkles, Layers, Link2, Upload } from 'lucide-react';
 
 export default function Home() {
   const { user } = useContext(AuthContext);
-  const [mode, setMode] = useState('single'); // 'single' or 'bulk'
+  const [mode, setMode] = useState('single'); 
   
   // Single Mode State
   const [longUrl, setLongUrl] = useState('');
@@ -17,6 +17,7 @@ export default function Home() {
   // Bulk Mode State
   const [bulkInput, setBulkInput] = useState('');
   const [bulkResults, setBulkResults] = useState([]);
+  const fileInputRef = useRef(null);
   
   // Shared State
   const [copiedId, setCopiedId] = useState(null);
@@ -44,7 +45,6 @@ export default function Home() {
     e.preventDefault();
     setLoading(true); setError(''); setBulkResults([]);
     
-    // Split by newlines and remove empty lines
     const urls = bulkInput.split('\n').map(u => u.trim()).filter(u => u !== '');
     
     if (urls.length > 10) {
@@ -61,6 +61,40 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // CSV Parsing Logic
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      
+      // Split by newlines, get the first column (in case of standard CSVs), and filter empty lines
+      const extractedUrls = text.split(/\r?\n/)
+        .map(line => line.split(',')[0].trim())
+        .filter(url => url.startsWith('http://') || url.startsWith('https://'));
+
+      if (extractedUrls.length === 0) {
+        setError('No valid HTTP/HTTPS URLs found in the first column of the CSV.');
+        return;
+      }
+      
+      if (extractedUrls.length > 10) {
+        setError('Found more than 10 URLs. Only the first 10 have been loaded to prevent server overload.');
+        extractedUrls.length = 10;
+      } else {
+        setError('');
+      }
+
+      setBulkInput(extractedUrls.join('\n'));
+      // Reset file input so the same file can be uploaded again if needed
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    
+    reader.readAsText(file);
   };
 
   const copyToClipboard = (url, id = 'single') => {
@@ -90,16 +124,10 @@ export default function Home() {
         {/* Mode Toggle */}
         <div className="flex justify-center">
           <div className="inline-flex bg-gray-200 dark:bg-gray-800 p-1 rounded-lg">
-            <button
-              onClick={() => { setMode('single'); setError(''); }}
-              className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'single' ? 'bg-white dark:bg-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
-            >
+            <button onClick={() => { setMode('single'); setError(''); }} className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'single' ? 'bg-white dark:bg-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}>
               <Link2 className="w-4 h-4" /> Single
             </button>
-            <button
-              onClick={() => { setMode('bulk'); setError(''); }}
-              className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'bulk' ? 'bg-white dark:bg-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
-            >
+            <button onClick={() => { setMode('bulk'); setError(''); }} className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-colors ${mode === 'bulk' ? 'bg-white dark:bg-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}>
               <Layers className="w-4 h-4" /> Bulk
             </button>
           </div>
@@ -133,7 +161,15 @@ export default function Home() {
         {mode === 'bulk' && (
           <form onSubmit={handleBulkSubmit} className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-xl space-y-4 border border-gray-200 dark:border-gray-800">
             <div>
-              <label className="block text-sm font-medium mb-1">Paste Multiple URLs (One per line, max 10)</label>
+              <div className="flex justify-between items-end mb-1">
+                <label className="block text-sm font-medium">Paste Multiple URLs (One per line, max 10)</label>
+                <div>
+                  <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" id="csv-upload" />
+                  <label htmlFor="csv-upload" className="cursor-pointer text-xs flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline">
+                    <Upload className="w-3.5 h-3.5" /> Upload .CSV
+                  </label>
+                </div>
+              </div>
               <textarea
                 required
                 rows="6"
