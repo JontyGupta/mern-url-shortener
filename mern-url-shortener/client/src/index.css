@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+/* This allows your ThemeContext to toggle dark mode manually via the .dark class */
+@custom-variant dark (&:where(.dark, .dark *));
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
